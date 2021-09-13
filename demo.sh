@@ -15,8 +15,16 @@ readonly flyway_bin="$flyway_dir/flyway"
 readonly flyway_archive="flyway-commandline-$flyway_version-linux-x64.tar.gz"
 readonly flyway_url="https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/$flyway_version/$flyway_archive"
 
+# Only use sudo if user is not in docker group.
+if grep -q '\bdocker\b' <(groups)
+then
+  readonly docker=docker
+else
+  readonly docker='sudo docker'
+fi
+
 pg_start() {
-  docker run \
+  $docker run \
     --detach \
     --env POSTGRES_USER="$pg_user" \
     --env POSTGRES_PASSWORD="$pg_pass" \
@@ -28,7 +36,7 @@ pg_start() {
 }
 
 pg_stop() {
-  docker stop "$pg_container"
+  $docker stop "$pg_container"
 }
 
 pg_wait() {
@@ -100,17 +108,17 @@ prepare_schema() {
 
   # Create table and dump resulting schema.  Also create a sequence with SERIAL
   # whose name is derived from the table name.
-  docker exec "$pg_container" psql \
+  $docker exec "$pg_container" psql \
     --command 'CREATE TABLE '"$table_name"' (id SERIAL)' \
     "$pg_db" "$pg_user"
 
-  docker exec "$pg_container" pg_dump \
+  $docker exec "$pg_container" pg_dump \
     --user "$pg_user" \
     "$pg_db" \
     > "$schema_file"
 
   # Drop the table again so that Flyway finds an empty schema.
-  docker exec "$pg_container" psql \
+  $docker exec "$pg_container" psql \
     --command 'DROP TABLE '"$table_name" \
     "$pg_db" "$pg_user"
 
